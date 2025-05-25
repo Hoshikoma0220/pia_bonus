@@ -15,9 +15,10 @@ db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS guild_settings (
       guildId TEXT PRIMARY KEY,
-      emoji TEXT DEFAULT '<:mag_coin:1367495903900074054>',
+      emoji TEXT,
       channelId TEXT,
-      sendTime TEXT DEFAULT '09:00'
+      sendTime TEXT DEFAULT '09:00',
+      sendDay TEXT DEFAULT 'Monday'
     )
   `);
 });
@@ -54,21 +55,35 @@ export function resetStats(guildId, userId = null) {
 }
 
 export function setEmoji(guildId, emoji) {
-  db.run(`INSERT INTO guild_settings (guildId, emoji)
+  db.run(`
+    INSERT INTO guild_settings (guildId, emoji)
     VALUES (?, ?)
-    ON CONFLICT(guildId) DO UPDATE SET emoji = ?`, [guildId, emoji, emoji]);
+    ON CONFLICT(guildId) DO UPDATE SET emoji = ?
+  `, [guildId, emoji, emoji]);
 }
 
 export function setChannel(guildId, channelId) {
-  db.run(`INSERT INTO guild_settings (guildId, channelId)
+  db.run(`
+    INSERT INTO guild_settings (guildId, channelId)
     VALUES (?, ?)
-    ON CONFLICT(guildId) DO UPDATE SET channelId = ?`, [guildId, channelId, channelId]);
+    ON CONFLICT(guildId) DO UPDATE SET channelId = ?
+  `, [guildId, channelId, channelId]);
 }
 
 export function setTime(guildId, time) {
-  db.run(`INSERT INTO guild_settings (guildId, sendTime)
+  db.run(`
+    INSERT INTO guild_settings (guildId, sendTime)
     VALUES (?, ?)
-    ON CONFLICT(guildId) DO UPDATE SET sendTime = ?`, [guildId, time, time]);
+    ON CONFLICT(guildId) DO UPDATE SET sendTime = ?
+  `, [guildId, time, time]);
+}
+
+export function setDay(guildId, day) {
+  db.run(`
+    INSERT INTO guild_settings (guildId, sendDay)
+    VALUES (?, ?)
+    ON CONFLICT(guildId) DO UPDATE SET sendDay = ?
+  `, [guildId, day, day]);
 }
 
 export function getSettings(guildId, callback) {
