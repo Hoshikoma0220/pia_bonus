@@ -112,6 +112,22 @@ client.on(Events.InteractionCreate, async interaction => {
       resetStats(guildId);
       interaction.reply({ content: `サーバー全体の記録をリセットしました。`, ephemeral: true });
     }
+  } else if (commandName === 'pia-settings') {
+    getSettings(guildId, (settings) => {
+      if (!settings) {
+        return interaction.reply({ content: '設定がまだ保存されていません。', ephemeral: true });
+      }
+
+      const summary = [
+        `📝 **現在の設定**`,
+        `📌 絵文字: ${settings.emoji || '未設定'}`,
+        `📢 チャンネル: ${settings.channelId ? `<#${settings.channelId}>` : '未設定'}`,
+        `⏰ 送信時刻: ${settings.sendTime || '未設定'}`,
+        `📅 曜日: ${settings.sendDay || '未設定'}`
+      ].join('\n');
+
+      interaction.reply({ content: summary, ephemeral: true });
+    });
   }
 });
 
