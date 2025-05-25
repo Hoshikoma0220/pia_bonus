@@ -33,7 +33,7 @@ client.once('ready', async () => {
   console.log(`Bot is ready! Logged in as ${client.user.tag}`);
 
   client.user.setPresence({
-    activities: [{ name: `${client.guilds.cache.size}のサーバーで導入中`, type: ActivityType.Playing }],
+    activities: [{ name: `${client.guilds.cache.size}つのサーバーで導入中`, type: ActivityType.Playing }],
     status: 'online'
   });
 
@@ -89,7 +89,7 @@ client.on('messageCreate', async message => {
 
     const reply = mentions.size === 1
       ? `<@${senderId}>さん、記録しました！`
-      : `<@${senderId}>さん、${mentions.size}人分（ロール含む）を記録しました！`;
+      : `<@${senderId}>さん、${mentions.size}人分を記録しました！`;
 
     message.reply(reply);
   });
@@ -246,10 +246,10 @@ cron.schedule('*/5 * * * *', () => {
         });
 
         const response = [
-          '**【週次集計】giveAward:**',
+          '**今週のgiveAward:**',
           ...linesSent,
           '',
-          '**【週次集計】receiveAward:**',
+          '**今週のreceiveAward:**',
           ...linesReceived
         ].join('\n');
 
