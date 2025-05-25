@@ -70,7 +70,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
   } else if (commandName === 'piahelp') {
     interaction.reply({
-      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定コマンド**\n- /piasetemoji <:emoji:>：記録対象の絵文字を設定\n- /piasetchannel #チャンネル：毎週の集計結果を送信するチャンネルを設定\n- /piasettime HH:mm：送信する時刻を設定（例: 09:00）\n- /piasetday 曜日：送信する曜日を設定（Monday〜Sunday）\n\n📊 **情報確認**\n- /piatotal：累計の送受信数ランキングを表示\n- /piaweekly：今週の送受信数ランキングを表示\n\n🔄 **リセット（管理者のみ）**\n- /piareset 自分 / 全体：記録をリセット（全体は管理者のみ）`,
+      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定コマンド**\n- /piasetemoji <:emoji:>：記録対象の絵文字を設定\n- /piasetchannel #チャンネル：毎週の集計結果を送信するチャンネルを設定\n- /piasettime HH:mm：送信する時刻を設定（例: 09:00）\n- /piasetday 曜日：送信する曜日を設定（Monday〜Sunday）\n\n📊 **情報確認**\n- /piatotal：累計の送受信数ランキングを表示\n- /piaweekly：今週の送受信数ランキングを表示\n- /pia-settings：現在の設定を表示\n\n🔄 **リセット（管理者のみ）**\n- /piareset 自分 / 全体：記録をリセット（全体は管理者のみ）`,
       ephemeral: true
     });
 
@@ -112,10 +112,13 @@ client.on(Events.InteractionCreate, async interaction => {
       resetStats(guildId);
       interaction.reply({ content: `サーバー全体の記録をリセットしました。`, ephemeral: true });
     }
+
   } else if (commandName === 'pia-settings') {
+    await interaction.deferReply({ ephemeral: true });
+
     getSettings(guildId, (settings) => {
       if (!settings) {
-        return interaction.reply({ content: '設定がまだ保存されていません。', ephemeral: true });
+        return interaction.editReply({ content: '設定がまだ保存されていません。' });
       }
 
       const summary = [
@@ -126,7 +129,7 @@ client.on(Events.InteractionCreate, async interaction => {
         `📅 曜日: ${settings.sendDay || '未設定'}`
       ].join('\n');
 
-      interaction.reply({ content: summary, ephemeral: true });
+      interaction.editReply({ content: summary });
     });
   }
 });
