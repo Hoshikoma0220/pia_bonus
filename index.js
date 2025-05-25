@@ -73,7 +73,7 @@ client.on('messageCreate', async message => {
   if (mentions.size === 0) return;
 
   const guildId = message.guild.id;
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = new Date().toISOString().slice(0, 10);
 
   getSettings(guildId, (settings) => {
     const emoji = settings?.emoji;
@@ -95,7 +95,103 @@ client.on('messageCreate', async message => {
   });
 });
 
-// 週次送信（5分おきにチェック）
+client.on(Events.InteractionCreate, async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+  const { commandName, options, guildId, user, member } = interaction;
+
+  if (commandName === 'pia_setemoji') {
+    const emoji = options.getString('emoji');
+    setEmoji(guildId, emoji);
+    interaction.reply({ content: `絵文字を ${emoji} に設定しました。`, ephemeral: true });
+
+  } else if (commandName === 'pia_setchannel') {
+    const channel = options.getChannel('channel');
+    setChannel(guildId, channel.id);
+    interaction.reply({ content: `チャンネルを <#${channel.id}> に設定しました。`, ephemeral: true });
+
+  } else if (commandName === 'pia_settime') {
+    const time = options.getString('time');
+    setTime(guildId, time);
+    interaction.reply({ content: `送信時間を ${time} に設定しました。`, ephemeral: true });
+
+  } else if (commandName === 'pia_setday') {
+    const day = options.getString('day');
+    setDay(guildId, day);
+    interaction.reply({ content: `送信曜日を ${day} に設定しました。`, ephemeral: true });
+
+  } else if (commandName === 'pia_help') {
+    interaction.reply({
+      content:
+        `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定コマンド**\n` +
+        `- /pia_setemoji <:emoji:>：記録対象の絵文字を設定\n` +
+        `- /pia_setchannel #チャンネル：送信先チャンネル設定\n` +
+        `- /pia_settime HH:mm：送信時間を設定\n` +
+        `- /pia_setday 曜日：送信曜日を設定\n\n📊 **情報確認**\n` +
+        `- /pia_total：累計ランキング\n` +
+        `- /pia_weekly：今週のランキング\n` +
+        `- /pia_settings：現在の設定表示\n\n🔄 **リセット**\n` +
+        `- /pia_reset 自分 / 全体：記録をリセット（全体は管理者のみ）`,
+      ephemeral: true
+    });
+
+  } else if (commandName === 'pia_total' || commandName === 'pia_weekly') {
+    getStatsByGuild(guildId, async rows => {
+      const sortedSent = rows.filter(r => r.sent > 0).sort((a, b) => b.sent - a.sent).slice(0, 5);
+      const sortedReceived = rows.filter(r => r.received > 0).sort((a, b) => b.received - a.received).slice(0, 5);
+
+      const linesSent = await Promise.all(sortedSent.map(async row => {
+        const user = await client.users.fetch(row.userId).catch(() => null);
+        return `${user?.username ?? row.userId}: ${row.sent}個`;
+      }));
+
+      const linesReceived = await Promise.all(sortedReceived.map(async row => {
+        const user = await client.users.fetch(row.userId).catch(() => null);
+        return `${user?.username ?? row.userId}: ${row.received}個`;
+      }));
+
+      const response = [
+        `**${commandName === 'pia_total' ? '累計' : '今週'}のgiveAward:**`,
+        ...linesSent,
+        '',
+        `**${commandName === 'pia_total' ? '累計' : '今週'}のreceiveAward:**`,
+        ...linesReceived
+      ].join('\n');
+
+      interaction.reply({ content: response });
+    });
+
+  } else if (commandName === 'pia_reset') {
+    const target = options.getString('target');
+    if (target === 'me') {
+      resetStats(guildId, user.id);
+      interaction.reply({ content: 'あなたの記録をリセットしました。', ephemeral: true });
+    } else {
+      if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '🚫 あなたには全体のリセットを行う権限がありません。', ephemeral: true });
+      }
+      resetStats(guildId);
+      interaction.reply({ content: 'サーバー全体の記録をリセットしました。', ephemeral: true });
+    }
+
+  } else if (commandName === 'pia_settings') {
+    getSettings(guildId, (settings) => {
+      if (!settings) {
+        return interaction.reply({ content: '設定がまだ保存されていません。', ephemeral: true });
+      }
+
+      const summary = [
+        `📝 **現在の設定**`,
+        `📌 絵文字: ${settings.emoji || '未設定'}`,
+        `📢 チャンネル: ${settings.channelId ? `<#${settings.channelId}>` : '未設定'}`,
+        `⏰ 送信時刻: ${settings.sendTime || '未設定'}`,
+        `📅 曜日: ${settings.sendDay || '未設定'}`
+      ].join('\n');
+
+      interaction.reply({ content: summary, ephemeral: true });
+    });
+  }
+});
+
 cron.schedule('*/5 * * * *', () => {
   const now = new Date();
   const todayWeekday = now.toLocaleDateString('en-US', { weekday: 'long' });
