@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Events, PermissionFlagsBits } from 'discord.js';
+import { Client, GatewayIntentBits, Events, PermissionFlagsBits, ActivityType } from 'discord.js';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import {
@@ -25,6 +25,11 @@ const client = new Client({
 
 client.once('ready', () => {
   console.log(`Bot is ready! Logged in as ${client.user.tag}`);
+
+  client.user.setPresence({
+    activities: [{ name: `${client.guilds.cache.size}のサーバーで導入中`, type: ActivityType.Playing }],
+    status: 'online'
+  });
 });
 
 client.on('messageCreate', async message => {
@@ -40,25 +45,33 @@ client.on('messageCreate', async message => {
     }
   });
 
-  // ロールメンション（送信者を除外）
-  message.mentions.roles.forEach(role => {
-    role.members.forEach(member => {
-      if (!member.user.bot && member.user.id !== senderId) {
-        mentions.add(member.user.id);
-      }
-    });
-  });
+  try {
+    const allMembers = await message.guild.members.fetch();
 
-  // @everyone（送信者とBotを除外）
-  if (message.mentions.everyone) {
-    message.guild.members.cache.forEach(member => {
-      if (!member.user.bot && member.user.id !== senderId) {
-        mentions.add(member.user.id);
-      }
+    // ロールメンション
+    message.mentions.roles.forEach(role => {
+      allMembers.forEach(member => {
+        if (member.roles.cache.has(role.id) && !member.user.bot && member.id !== senderId) {
+          mentions.add(member.id);
+        }
+      });
     });
+
+    // @everyone
+    if (message.mentions.everyone) {
+      allMembers.forEach(member => {
+        if (!member.user.bot && member.id !== senderId) {
+          mentions.add(member.id);
+        }
+      });
+    }
+
+  } catch (err) {
+    console.error('ロール/メンバー取得エラー:', err);
+    return;
   }
 
-  mentions.delete(client.user.id); // Bot自身が含まれている場合も除外
+  mentions.delete(client.user.id);
   if (mentions.size === 0) return;
 
   const guildId = message.guild.id;
@@ -66,7 +79,6 @@ client.on('messageCreate', async message => {
     const emoji = settings?.emoji;
     if (!emoji || !message.content.includes(emoji)) return;
 
-    // 記録処理
     addSent(guildId, senderId);
     mentions.forEach(userId => {
       addReceived(guildId, userId);
