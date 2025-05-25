@@ -23,35 +23,28 @@ const client = new Client({
   ]
 });
 
-client.once('ready', async () => {
+client.once('ready', () => {
   console.log(`Bot is ready! Logged in as ${client.user.tag}`);
-
-  const channelId = '1376009165646073938';
-  const now = new Date();
-  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const timeStr = now.toTimeString().split(' ')[0].slice(0, 5);
-  const dayStr = daysOfWeek[now.getDay()];
-
-  try {
-    const channel = await client.channels.fetch(channelId);
-    if (channel?.isTextBased()) {
-      await channel.send(`📌 Botが起動しました\n🕒 現在の時刻: ${timeStr}\n📅 曜日: ${dayStr}`);
-    }
-  } catch (error) {
-    console.error('🚨 起動時メッセージ送信失敗:', error);
-  }
 });
 
 client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
 
-  const mentions = new Set(message.mentions.users.map(user => user.id));
+  const mentions = new Set();
+
+  // ユーザーの直接メンション
+  message.mentions.users.forEach(user => {
+    if (!user.bot) mentions.add(user.id);
+  });
+
+  // ロールメンション対象のメンバー全員
   message.mentions.roles.forEach(role => {
     role.members.forEach(member => {
       if (!member.user.bot) mentions.add(member.user.id);
     });
   });
 
+  // @everyone の場合：全メンバーからBot以外を対象に追加
   if (message.mentions.everyone) {
     const members = await message.guild.members.fetch();
     members.forEach(member => {
@@ -206,7 +199,7 @@ cron.schedule('* * * * *', () => {
 
         const threadName = `${now.getMonth() + 1}/${now.getDate()} ~ ${now.getMonth() + 1}/${now.getDate() + 6} の結果`;
 
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒の遅延
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒遅延
 
         const thread = await message.startThread({
           name: threadName,
@@ -214,10 +207,10 @@ cron.schedule('* * * * *', () => {
         });
 
         const response = [
-          '**【毎週集計】giveAward:**',
+          '**今週のgiveAward:**',
           ...linesSent,
           '',
-          '**【毎週集計】receiveAward:**',
+          '**今週のreceiveAward:**',
           ...linesReceived
         ].join('\n');
 
