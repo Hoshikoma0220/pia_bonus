@@ -89,7 +89,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
   } else if (commandName === 'piahelp') {
     interaction.reply({
-      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定コマンド**\n- /piasetemoji <:emoji:>：記録対象の絵文字を設定\n- /piasetchannel #チャンネル：送信先チャンネル設定\n- /piasettime HH:mm：送信時間を設定\n- /piasetday 曜日：送信曜日を設定\n\n📊 **情報確認**\n- /piatotal：累計ランキング\n- /piaweekly：今週のランキング\n- /pia-settings：現在の設定表示\n\n🔄 **リセット**\n- /piareset 自分 / 全体：記録をリセット（全体は管理者のみ）`,
+      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定コマンド**\n- /piasetemoji <:emoji:>：記録対象の絵文字を設定\n- /piasetchannel #チャンネル：送信先チャンネル設定\n- /piasettime HH:mm：送信時間を設定\n- /piasetday 曜日：送信曜日を設定\n\n📊 **情報確認**\n- /piatotal：累計ランキング\n- /piaweekly：今週のランキング\n- /piasettings：現在の設定表示\n\n🔄 **リセット**\n- /piareset 自分 / 全体：記録をリセット（全体は管理者のみ）`,
       ephemeral: true
     });
 
@@ -132,8 +132,8 @@ client.on(Events.InteractionCreate, async interaction => {
       interaction.reply({ content: 'サーバー全体の記録をリセットしました。', ephemeral: true });
     }
 
-  } else if (commandName === 'pia-settings') {
-    console.log('pia-settings invoked');
+  } else if (commandName === 'piasettings') {
+    console.log('piasettings invoked');
     await interaction.deferReply({ ephemeral: true });
 
     getSettings(guildId, (settings) => {

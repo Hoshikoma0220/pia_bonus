@@ -5,7 +5,7 @@ dotenv.config();
 
 const commands = [
   new SlashCommandBuilder()
-    .setName('pia-setemoji')
+    .setName('piasetemoji')
     .setDescription('記録対象にする絵文字を設定します')
     .addStringOption(option =>
       option.setName('emoji')
@@ -13,7 +13,7 @@ const commands = [
         .setRequired(true)),
 
   new SlashCommandBuilder()
-    .setName('pia-setchannel')
+    .setName('piasetchannel')
     .setDescription('集計結果を送信するチャンネルを設定します')
     .addChannelOption(option =>
       option.setName('channel')
@@ -21,7 +21,7 @@ const commands = [
         .setRequired(true)),
 
   new SlashCommandBuilder()
-    .setName('pia-settime')
+    .setName('piasettime')
     .setDescription('集計結果を送信する時刻を設定します (例: 09:00)')
     .addStringOption(option =>
       option.setName('time')
@@ -29,7 +29,7 @@ const commands = [
         .setRequired(true)),
 
   new SlashCommandBuilder()
-    .setName('pia-setday')
+    .setName('piasetday')
     .setDescription('集計結果を送信する曜日を設定します')
     .addStringOption(option =>
       option.setName('day')
@@ -46,15 +46,15 @@ const commands = [
         )),
 
   new SlashCommandBuilder()
-    .setName('pia-total')
+    .setName('piatotal')
     .setDescription('累計の送受信数ランキングを表示します'),
 
   new SlashCommandBuilder()
-    .setName('pia-weekly')
+    .setName('piaweekly')
     .setDescription('今週の送受信数ランキングを表示します'),
 
   new SlashCommandBuilder()
-    .setName('pia-reset')
+    .setName('piareset')
     .setDescription('統計をリセットします')
     .addStringOption(option =>
       option.setName('target')
@@ -66,11 +66,11 @@ const commands = [
         )),
 
   new SlashCommandBuilder()
-    .setName('pia-help')
+    .setName('piahelp')
     .setDescription('Pia Botの使い方を表示します'),
 
   new SlashCommandBuilder()
-    .setName('pia-settings')
+    .setName('piasettings')
     .setDescription('現在のBot設定を確認します')
 ]
   .map(command => command.toJSON());
