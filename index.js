@@ -1,4 +1,3 @@
-// index.js
 import { Client, GatewayIntentBits, Events, PermissionFlagsBits } from 'discord.js';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
@@ -17,7 +16,11 @@ import {
 dotenv.config();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
 client.once('ready', () => {
@@ -27,17 +30,33 @@ client.once('ready', () => {
 client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
 
-  const mentions = message.mentions.users;
+  const mentions = new Set(message.mentions.users.map(user => user.id));
+
+  // ロールメンション展開
+  message.mentions.roles.forEach(role => {
+    role.members.forEach(member => {
+      if (!member.user.bot) mentions.add(member.user.id);
+    });
+  });
+
+  // @everyone 対応
+  if (message.mentions.everyone) {
+    const members = await message.guild.members.fetch();
+    members.forEach(member => {
+      if (!member.user.bot) mentions.add(member.user.id);
+    });
+  }
+
   const guildId = message.guild.id;
 
   getSettings(guildId, (settings) => {
     const emoji = settings?.emoji;
-    if (!emoji || !mentions.size || !message.content.includes(emoji)) return;
-    if (mentions.has(client.user)) return;
+    if (!emoji || mentions.size === 0 || !message.content.includes(emoji)) return;
+    if (message.mentions.has(client.user)) return;
 
     addSent(guildId, message.author.id);
-    mentions.forEach(user => {
-      if (!user.bot) addReceived(guildId, user.id);
+    mentions.forEach(userId => {
+      addReceived(guildId, userId);
     });
 
     message.reply(`<@${message.author.id}>さん、記録しました！`);
@@ -46,7 +65,7 @@ client.on('messageCreate', async message => {
 
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
-  const { commandName, options, guildId, user, member, channel } = interaction;
+  const { commandName, options, guildId, user, member } = interaction;
 
   if (commandName === 'piasetemoji') {
     const emoji = options.getString('emoji');
@@ -54,9 +73,9 @@ client.on(Events.InteractionCreate, async interaction => {
     interaction.reply({ content: `絵文字を ${emoji} に設定しました。`, ephemeral: true });
 
   } else if (commandName === 'piasetchannel') {
-    const targetChannel = options.getChannel('channel');
-    setChannel(guildId, targetChannel.id);
-    interaction.reply({ content: `チャンネルを <#${targetChannel.id}> に設定しました。`, ephemeral: true });
+    const channel = options.getChannel('channel');
+    setChannel(guildId, channel.id);
+    interaction.reply({ content: `チャンネルを <#${channel.id}> に設定しました。`, ephemeral: true });
 
   } else if (commandName === 'piasettime') {
     const time = options.getString('time');
@@ -70,7 +89,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
   } else if (commandName === 'piahelp') {
     interaction.reply({
-      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定コマンド**\n- /piasetemoji <:emoji:>：記録対象の絵文字を設定\n- /piasetchannel #チャンネル：毎週の集計結果を送信するチャンネルを設定\n- /piasettime HH:mm：送信する時刻を設定（例: 09:00）\n- /piasetday 曜日：送信する曜日を設定（Monday〜Sunday）\n\n📊 **情報確認**\n- /piatotal：累計の送受信数ランキングを表示\n- /piaweekly：今週の送受信数ランキングを表示\n- /pia-settings：現在の設定を表示\n\n🔄 **リセット（管理者のみ）**\n- /piareset 自分 / 全体：記録をリセット（全体は管理者のみ）`,
+      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定コマンド**\n- /piasetemoji <:emoji:>：記録対象の絵文字を設定\n- /piasetchannel #チャンネル：送信先チャンネル設定\n- /piasettime HH:mm：送信時間を設定\n- /piasetday 曜日：送信曜日を設定\n\n📊 **情報確認**\n- /piatotal：累計ランキング\n- /piaweekly：今週のランキング\n- /pia-settings：現在の設定表示\n\n🔄 **リセット**\n- /piareset 自分 / 全体：記録をリセット（全体は管理者のみ）`,
       ephemeral: true
     });
 
@@ -80,20 +99,20 @@ client.on(Events.InteractionCreate, async interaction => {
       const sortedReceived = rows.sort((a, b) => b.received - a.received).slice(0, 5);
 
       const linesSent = await Promise.all(sortedSent.map(async row => {
-        const u = await client.users.fetch(row.userId).catch(() => null);
-        return `${u?.username ?? row.userId}: ${row.sent}個`;
+        const user = await client.users.fetch(row.userId).catch(() => null);
+        return `${user?.username ?? row.userId}: ${row.sent}個`;
       }));
 
       const linesReceived = await Promise.all(sortedReceived.map(async row => {
-        const u = await client.users.fetch(row.userId).catch(() => null);
-        return `${u?.username ?? row.userId}: ${row.received}個`;
+        const user = await client.users.fetch(row.userId).catch(() => null);
+        return `${user?.username ?? row.userId}: ${row.received}個`;
       }));
 
       const response = [
-        `** ${commandName === 'piatotal' ? '累計' : '今週'}のgiveAward:**`,
+        `**${commandName === 'piatotal' ? '累計' : '今週'}のgiveAward:**`,
         ...linesSent,
         '',
-        `** ${commandName === 'piatotal' ? '累計' : '今週'}のreceiveAward :**`,
+        `**${commandName === 'piatotal' ? '累計' : '今週'}のreceiveAward:**`,
         ...linesReceived
       ].join('\n');
 
@@ -104,19 +123,21 @@ client.on(Events.InteractionCreate, async interaction => {
     const target = options.getString('target');
     if (target === 'me') {
       resetStats(guildId, user.id);
-      interaction.reply({ content: `あなたの記録をリセットしました。`, ephemeral: true });
+      interaction.reply({ content: 'あなたの記録をリセットしました。', ephemeral: true });
     } else {
       if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({ content: '🚫 あなたには全体のリセットを行う権限がありません。', ephemeral: true });
       }
       resetStats(guildId);
-      interaction.reply({ content: `サーバー全体の記録をリセットしました。`, ephemeral: true });
+      interaction.reply({ content: 'サーバー全体の記録をリセットしました。', ephemeral: true });
     }
 
   } else if (commandName === 'pia-settings') {
+    console.log('pia-settings invoked');
     await interaction.deferReply({ ephemeral: true });
 
     getSettings(guildId, (settings) => {
+      console.log('DB settings:', settings);
       if (!settings) {
         return interaction.editReply({ content: '設定がまだ保存されていません。' });
       }
@@ -140,13 +161,11 @@ cron.schedule('0 * * * *', () => {
   const today = daysOfWeek[now.getDay()];
 
   client.guilds.cache.forEach(guild => {
-    getSettings(guild.id, async (settings) => {
+    getSettings(guild.id, async settings => {
       if (!settings || !settings.channelId || !settings.sendTime || !settings.sendDay) return;
 
-      const [setHour, setMin] = settings.sendTime.split(":").map(v => parseInt(v));
-      const nowHour = now.getHours();
-      const nowMin = now.getMinutes();
-      if (setHour !== nowHour || setMin !== nowMin) return;
+      const [hour, minute] = settings.sendTime.split(':').map(Number);
+      if (hour !== now.getHours() || minute !== now.getMinutes()) return;
       if (settings.sendDay !== today) return;
 
       getStatsByGuild(guild.id, async rows => {
@@ -155,15 +174,15 @@ cron.schedule('0 * * * *', () => {
         const linesSent = await Promise.all(rows
           .sort((a, b) => b.sent - a.sent).slice(0, 5)
           .map(async row => {
-            const u = await client.users.fetch(row.userId).catch(() => null);
-            return `${u?.username ?? row.userId}: ${row.sent}個`;
+            const user = await client.users.fetch(row.userId).catch(() => null);
+            return `${user?.username ?? row.userId}: ${row.sent}個`;
           }));
 
         const linesReceived = await Promise.all(rows
           .sort((a, b) => b.received - a.received).slice(0, 5)
           .map(async row => {
-            const u = await client.users.fetch(row.userId).catch(() => null);
-            return `${u?.username ?? row.userId}: ${row.received}個`;
+            const user = await client.users.fetch(row.userId).catch(() => null);
+            return `${user?.username ?? row.userId}: ${row.received}個`;
           }));
 
         const response = [
