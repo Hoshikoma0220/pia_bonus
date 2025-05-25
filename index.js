@@ -31,23 +31,25 @@ client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
 
   const mentions = new Set();
+  const guildMembers = await message.guild.members.fetch(); // ← 全メンバー取得
 
-  // ユーザーの直接メンション
+  // ユーザー直接メンション
   message.mentions.users.forEach(user => {
     if (!user.bot) mentions.add(user.id);
   });
 
-  // ロールメンション対象のメンバー全員
+  // ロールメンション対象メンバーを抽出
   message.mentions.roles.forEach(role => {
-    role.members.forEach(member => {
-      if (!member.user.bot) mentions.add(member.user.id);
+    guildMembers.forEach(member => {
+      if (!member.user.bot && member.roles.cache.has(role.id)) {
+        mentions.add(member.user.id);
+      }
     });
   });
 
-  // @everyone の場合：全メンバーからBot以外を対象に追加
+  // @everyone メンション
   if (message.mentions.everyone) {
-    const members = await message.guild.members.fetch();
-    members.forEach(member => {
+    guildMembers.forEach(member => {
       if (!member.user.bot) mentions.add(member.user.id);
     });
   }
@@ -70,14 +72,6 @@ client.on('messageCreate', async message => {
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName, options, guildId, user, member } = interaction;
-
-  if (commandName === 'pia_now') {
-    const now = new Date();
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const timeStr = now.toTimeString().split(' ')[0].slice(0, 5);
-    const dayStr = days[now.getDay()];
-    return interaction.reply({ content: `🕒 現在のBot時刻: ${timeStr}\n📅 曜日: ${dayStr}`, ephemeral: true });
-  }
 
   if (commandName === 'pia_settings') {
     await interaction.deferReply({ ephemeral: true });
@@ -154,7 +148,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
   } else if (commandName === 'pia_help') {
     interaction.reply({
-      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定**\n- /pia_setemoji <:emoji:>\n- /pia_setchannel #チャンネル\n- /pia_settime HH:mm\n- /pia_setday 曜日\n\n📊 **集計**\n- /pia_total（累計）\n- /pia_weekly（今週）\n- /pia_settings（現在の設定）\n- /pia_now（現在のBot時刻）\n\n🔄 **リセット**\n- /pia_reset 自分 / 全体`,
+      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定**\n- /pia_setemoji <:emoji:>\n- /pia_setchannel #チャンネル\n- /pia_settime HH:mm\n- /pia_setday 曜日\n\n📊 **集計**\n- /pia_total（累計）\n- /pia_weekly（今週）\n- /pia_settings（現在の設定）\n\n🔄 **リセット**\n- /pia_reset 自分 / 全体`,
       ephemeral: true
     });
   }
@@ -199,7 +193,7 @@ cron.schedule('* * * * *', () => {
 
         const threadName = `${now.getMonth() + 1}/${now.getDate()} ~ ${now.getMonth() + 1}/${now.getDate() + 6} の結果`;
 
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒遅延
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         const thread = await message.startThread({
           name: threadName,
