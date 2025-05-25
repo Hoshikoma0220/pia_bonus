@@ -2,6 +2,7 @@ import sqlite3 from 'sqlite3';
 const db = new sqlite3.Database('./emojiStats.db');
 
 db.serialize(() => {
+  // 統計データ
   db.run(`
     CREATE TABLE IF NOT EXISTS stats (
       guildId TEXT,
@@ -12,16 +13,21 @@ db.serialize(() => {
     )
   `);
 
+  // サーバーごとの設定
   db.run(`
     CREATE TABLE IF NOT EXISTS guild_settings (
       guildId TEXT PRIMARY KEY,
-      emoji TEXT,
+      emoji TEXT DEFAULT '<:mag_coin:1367495903900074054>',
       channelId TEXT,
       sendTime TEXT DEFAULT '09:00',
       sendDay TEXT DEFAULT 'Monday'
     )
   `);
 });
+
+// ------------------------
+// 統計管理
+// ------------------------
 
 export function addSent(guildId, userId) {
   db.run(`
@@ -53,6 +59,10 @@ export function resetStats(guildId, userId = null) {
     db.run(`UPDATE stats SET sent = 0, received = 0 WHERE guildId = ?`, [guildId]);
   }
 }
+
+// ------------------------
+// サーバー設定管理
+// ------------------------
 
 export function setEmoji(guildId, emoji) {
   db.run(`
