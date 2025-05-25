@@ -32,14 +32,12 @@ client.on('messageCreate', async message => {
 
   const mentions = new Set(message.mentions.users.map(user => user.id));
 
-  // ロールメンション展開
   message.mentions.roles.forEach(role => {
     role.members.forEach(member => {
       if (!member.user.bot) mentions.add(member.user.id);
     });
   });
 
-  // @everyone 対応
   if (message.mentions.everyone) {
     const members = await message.guild.members.fetch();
     members.forEach(member => {
@@ -67,33 +65,43 @@ client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName, options, guildId, user, member } = interaction;
 
-  if (commandName === 'piasetemoji') {
+  if (commandName === 'pia_settings') {
+    await interaction.deferReply({ ephemeral: true });
+    getSettings(guildId, (settings) => {
+      if (!settings) {
+        return interaction.editReply({ content: '設定がまだ保存されていません。' });
+      }
+      const summary = [
+        `📝 **現在の設定**`,
+        `📌 絵文字: ${settings.emoji || '未設定'}`,
+        `📢 チャンネル: ${settings.channelId ? `<#${settings.channelId}>` : '未設定'}`,
+        `⏰ 送信時刻: ${settings.sendTime || '未設定'}`,
+        `📅 曜日: ${settings.sendDay || '未設定'}`
+      ].join('\n');
+      interaction.editReply({ content: summary });
+    });
+
+  } else if (commandName === 'pia_setemoji') {
     const emoji = options.getString('emoji');
     setEmoji(guildId, emoji);
     interaction.reply({ content: `絵文字を ${emoji} に設定しました。`, ephemeral: true });
 
-  } else if (commandName === 'piasetchannel') {
+  } else if (commandName === 'pia_setchannel') {
     const channel = options.getChannel('channel');
     setChannel(guildId, channel.id);
     interaction.reply({ content: `チャンネルを <#${channel.id}> に設定しました。`, ephemeral: true });
 
-  } else if (commandName === 'piasettime') {
+  } else if (commandName === 'pia_settime') {
     const time = options.getString('time');
     setTime(guildId, time);
-    interaction.reply({ content: `毎週の送信時刻を ${time} に設定しました。`, ephemeral: true });
+    interaction.reply({ content: `送信時刻を ${time} に設定しました。`, ephemeral: true });
 
-  } else if (commandName === 'piasetday') {
+  } else if (commandName === 'pia_setday') {
     const day = options.getString('day');
     setDay(guildId, day);
-    interaction.reply({ content: `送信曜日を ${day} に設定しました。`, ephemeral: true });
+    interaction.reply({ content: `曜日を ${day} に設定しました。`, ephemeral: true });
 
-  } else if (commandName === 'piahelp') {
-    interaction.reply({
-      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定コマンド**\n- /piasetemoji <:emoji:>：記録対象の絵文字を設定\n- /piasetchannel #チャンネル：送信先チャンネル設定\n- /piasettime HH:mm：送信時間を設定\n- /piasetday 曜日：送信曜日を設定\n\n📊 **情報確認**\n- /piatotal：累計ランキング\n- /piaweekly：今週のランキング\n- /piasettings：現在の設定表示\n\n🔄 **リセット**\n- /piareset 自分 / 全体：記録をリセット（全体は管理者のみ）`,
-      ephemeral: true
-    });
-
-  } else if (commandName === 'piatotal' || commandName === 'piaweekly') {
+  } else if (commandName === 'pia_total' || commandName === 'pia_weekly') {
     getStatsByGuild(guildId, async rows => {
       const sortedSent = rows.sort((a, b) => b.sent - a.sent).slice(0, 5);
       const sortedReceived = rows.sort((a, b) => b.received - a.received).slice(0, 5);
@@ -109,17 +117,17 @@ client.on(Events.InteractionCreate, async interaction => {
       }));
 
       const response = [
-        `**${commandName === 'piatotal' ? '累計' : '今週'}のgiveAward:**`,
+        `**${commandName === 'pia_total' ? '累計' : '今週'}のgiveAward:**`,
         ...linesSent,
         '',
-        `**${commandName === 'piatotal' ? '累計' : '今週'}のreceiveAward:**`,
+        `**${commandName === 'pia_total' ? '累計' : '今週'}のreceiveAward:**`,
         ...linesReceived
       ].join('\n');
 
       interaction.reply({ content: response });
     });
 
-  } else if (commandName === 'piareset') {
+  } else if (commandName === 'pia_reset') {
     const target = options.getString('target');
     if (target === 'me') {
       resetStats(guildId, user.id);
@@ -132,25 +140,10 @@ client.on(Events.InteractionCreate, async interaction => {
       interaction.reply({ content: 'サーバー全体の記録をリセットしました。', ephemeral: true });
     }
 
-  } else if (commandName === 'piasettings') {
-    console.log('piasettings invoked');
-    await interaction.deferReply({ ephemeral: true });
-
-    getSettings(guildId, (settings) => {
-      console.log('DB settings:', settings);
-      if (!settings) {
-        return interaction.editReply({ content: '設定がまだ保存されていません。' });
-      }
-
-      const summary = [
-        `📝 **現在の設定**`,
-        `📌 絵文字: ${settings.emoji || '未設定'}`,
-        `📢 チャンネル: ${settings.channelId ? `<#${settings.channelId}>` : '未設定'}`,
-        `⏰ 送信時刻: ${settings.sendTime || '未設定'}`,
-        `📅 曜日: ${settings.sendDay || '未設定'}`
-      ].join('\n');
-
-      interaction.editReply({ content: summary });
+  } else if (commandName === 'pia_help') {
+    interaction.reply({
+      content: `📘 **Pia Bot ヘルプガイド**\n\n🛠 **設定**\n- /pia_setemoji <:emoji:>\n- /pia_setchannel #チャンネル\n- /pia_settime HH:mm\n- /pia_setday 曜日\n\n📊 **集計**\n- /pia_total（累計）\n- /pia_weekly（今週）\n- /pia_settings（現在の設定）\n\n🔄 **リセット**\n- /pia_reset 自分 / 全体`,
+      ephemeral: true
     });
   }
 });
@@ -185,6 +178,24 @@ cron.schedule('0 * * * *', () => {
             return `${user?.username ?? row.userId}: ${row.received}個`;
           }));
 
+        const channel = await client.channels.fetch(settings.channelId).catch(() => null);
+        if (!channel?.isTextBased()) return;
+
+        const start = new Date();
+        start.setDate(now.getDate() - 6);
+
+        const formatDate = (d) => `${('0' + (d.getMonth() + 1)).slice(-2)}/${('0' + d.getDate()).slice(-2)}`;
+        const threadName = `${formatDate(start)}~${formatDate(now)}までの結果`;
+
+        const announcement = await channel.send(
+          'こんにちは！\n今週も皆さんお疲れ様でした\n今週のピアボーナスの結果をスレッドに投稿しました！\nご覧ください！'
+        );
+
+        const thread = await announcement.startThread({
+          name: threadName,
+          autoArchiveDuration: 1440
+        });
+
         const response = [
           '**【毎週集計】giveAward:**',
           ...linesSent,
@@ -193,8 +204,7 @@ cron.schedule('0 * * * *', () => {
           ...linesReceived
         ].join('\n');
 
-        const channel = await client.channels.fetch(settings.channelId).catch(() => null);
-        if (channel?.isTextBased()) channel.send(response);
+        thread.send(response);
       });
     });
   });
