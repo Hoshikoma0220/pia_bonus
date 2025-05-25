@@ -31,41 +31,55 @@ client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
 
   const mentions = new Set();
-  const guildMembers = await message.guild.members.fetch(); // ← 全メンバー取得
 
-  // ユーザー直接メンション
-  message.mentions.users.forEach(user => {
-    if (!user.bot) mentions.add(user.id);
-  });
+  try {
+    const guildMembers = await message.guild.members.fetch();
 
-  // ロールメンション対象メンバーを抽出
-  message.mentions.roles.forEach(role => {
-    guildMembers.forEach(member => {
-      if (!member.user.bot && member.roles.cache.has(role.id)) {
-        mentions.add(member.user.id);
-      }
+    // 直接メンションされたユーザー
+    message.mentions.users.forEach(user => {
+      if (!user.bot) mentions.add(user.id);
     });
-  });
 
-  // @everyone メンション
-  if (message.mentions.everyone) {
-    guildMembers.forEach(member => {
-      if (!member.user.bot) mentions.add(member.user.id);
+    // ロールメンション対象メンバーを抽出
+    message.mentions.roles.forEach(role => {
+      guildMembers.forEach(member => {
+        if (!member.user.bot && member.roles.cache.has(role.id)) {
+          mentions.add(member.user.id);
+        }
+      });
     });
+
+    // @everyone 対応
+    if (message.mentions.everyone) {
+      guildMembers.forEach(member => {
+        if (!member.user.bot) mentions.add(member.user.id);
+      });
+    }
+  } catch (err) {
+    console.error('メンション解析中にエラー:', err);
+    return;
   }
 
+  // Bot自身を除外
+  mentions.delete(client.user.id);
+  if (mentions.size === 0) return;
+
   const guildId = message.guild.id;
+
   getSettings(guildId, (settings) => {
     const emoji = settings?.emoji;
-    if (!emoji || mentions.size === 0 || !message.content.includes(emoji)) return;
-    if (message.mentions.has(client.user)) return;
+    if (!emoji || !message.content.includes(emoji)) return;
 
     addSent(guildId, message.author.id);
     mentions.forEach(userId => {
       addReceived(guildId, userId);
     });
 
-    message.reply(`<@${message.author.id}>さん、記録しました！`);
+    const reply = mentions.size === 1
+      ? `<@${message.author.id}>さん、記録しました！`
+      : `<@${message.author.id}>さん、${mentions.size}人分を記録しました！`;
+
+    message.reply(reply);
   });
 });
 
@@ -109,8 +123,8 @@ client.on(Events.InteractionCreate, async interaction => {
 
   } else if (commandName === 'pia_total' || commandName === 'pia_weekly') {
     getStatsByGuild(guildId, async rows => {
-      const sortedSent = rows.sort((a, b) => b.sent - a.sent).slice(0, 5);
-      const sortedReceived = rows.sort((a, b) => b.received - a.received).slice(0, 5);
+      const sortedSent = rows.filter(r => r.sent > 0).sort((a, b) => b.sent - a.sent).slice(0, 5);
+      const sortedReceived = rows.filter(r => r.received > 0).sort((a, b) => b.received - a.received).slice(0, 5);
 
       const linesSent = await Promise.all(sortedSent.map(async row => {
         const user = await client.users.fetch(row.userId).catch(() => null);
@@ -171,6 +185,7 @@ cron.schedule('* * * * *', () => {
         if (!rows.length) return;
 
         const linesSent = await Promise.all(rows
+          .filter(r => r.sent > 0)
           .sort((a, b) => b.sent - a.sent).slice(0, 5)
           .map(async row => {
             const user = await client.users.fetch(row.userId).catch(() => null);
@@ -178,6 +193,7 @@ cron.schedule('* * * * *', () => {
           }));
 
         const linesReceived = await Promise.all(rows
+          .filter(r => r.received > 0)
           .sort((a, b) => b.received - a.received).slice(0, 5)
           .map(async row => {
             const user = await client.users.fetch(row.userId).catch(() => null);
