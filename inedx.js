@@ -1,5 +1,5 @@
 // index.js
-import { Client, GatewayIntentBits, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Events, PermissionFlagsBits } from 'discord.js';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import {
@@ -45,7 +45,7 @@ client.on('messageCreate', async message => {
 
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
-  const { commandName, options, guildId, user } = interaction;
+  const { commandName, options, guildId, user, member, channel } = interaction;
 
   if (commandName === 'piasetemoji') {
     const emoji = options.getString('emoji');
@@ -53,9 +53,9 @@ client.on(Events.InteractionCreate, async interaction => {
     interaction.reply({ content: `絵文字を ${emoji} に設定しました。`, ephemeral: true });
 
   } else if (commandName === 'piasetchannel') {
-    const channel = options.getChannel('channel');
-    setChannel(guildId, channel.id);
-    interaction.reply({ content: `チャンネルを <#${channel.id}> に設定しました。`, ephemeral: true });
+    const targetChannel = options.getChannel('channel');
+    setChannel(guildId, targetChannel.id);
+    interaction.reply({ content: `チャンネルを <#${targetChannel.id}> に設定しました。`, ephemeral: true });
 
   } else if (commandName === 'piasettime') {
     const time = options.getString('time');
@@ -84,14 +84,14 @@ client.on(Events.InteractionCreate, async interaction => {
       }));
 
       const response = [
-        `**🏆 ${commandName === 'piatotal' ? '累計' : '今週'}のgiveAward:**`,
+        `** ${commandName === 'piatotal' ? '累計' : '今週'}のgiveAward:**`,
         ...linesSent,
         '',
-        `**== ${commandName === 'piatotal' ? '累計' : '今週'}のreceiveAward ==:**`,
+        `** ${commandName === 'piatotal' ? '累計' : '今週'}のreceiveAward :**`,
         ...linesReceived
       ].join('\n');
 
-      interaction.reply({ content: response, ephemeral: true });
+      interaction.reply({ content: response }); // 全体に送信（ephemeral: false）
     });
 
   } else if (commandName === 'piareset') {
@@ -100,6 +100,9 @@ client.on(Events.InteractionCreate, async interaction => {
       resetStats(guildId, user.id);
       interaction.reply({ content: `あなたの記録をリセットしました。`, ephemeral: true });
     } else {
+      if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '🚫 あなたには全体のリセットを行う権限がありません。', ephemeral: true });
+      }
       resetStats(guildId);
       interaction.reply({ content: `サーバー全体の記録をリセットしました。`, ephemeral: true });
     }
