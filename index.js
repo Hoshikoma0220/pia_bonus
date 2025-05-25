@@ -31,53 +31,50 @@ client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
 
   const mentions = new Set();
+  const senderId = message.author.id;
 
-  try {
-    const guildMembers = await message.guild.members.fetch();
-
-    // 直接メンションされたユーザー
-    message.mentions.users.forEach(user => {
-      if (!user.bot) mentions.add(user.id);
-    });
-
-    // ロールメンション対象メンバーを抽出
-    message.mentions.roles.forEach(role => {
-      guildMembers.forEach(member => {
-        if (!member.user.bot && member.roles.cache.has(role.id)) {
-          mentions.add(member.user.id);
-        }
-      });
-    });
-
-    // @everyone 対応
-    if (message.mentions.everyone) {
-      guildMembers.forEach(member => {
-        if (!member.user.bot) mentions.add(member.user.id);
-      });
+  // 個人メンション（Botと送信者を除外）
+  message.mentions.users.forEach(user => {
+    if (!user.bot && user.id !== senderId) {
+      mentions.add(user.id);
     }
-  } catch (err) {
-    console.error('メンション解析中にエラー:', err);
-    return;
+  });
+
+  // ロールメンション（送信者を除外）
+  message.mentions.roles.forEach(role => {
+    role.members.forEach(member => {
+      if (!member.user.bot && member.user.id !== senderId) {
+        mentions.add(member.user.id);
+      }
+    });
+  });
+
+  // @everyone（送信者とBotを除外）
+  if (message.mentions.everyone) {
+    message.guild.members.cache.forEach(member => {
+      if (!member.user.bot && member.user.id !== senderId) {
+        mentions.add(member.user.id);
+      }
+    });
   }
 
-  // Bot自身を除外
-  mentions.delete(client.user.id);
+  mentions.delete(client.user.id); // Bot自身が含まれている場合も除外
   if (mentions.size === 0) return;
 
   const guildId = message.guild.id;
-
   getSettings(guildId, (settings) => {
     const emoji = settings?.emoji;
     if (!emoji || !message.content.includes(emoji)) return;
 
-    addSent(guildId, message.author.id);
+    // 記録処理
+    addSent(guildId, senderId);
     mentions.forEach(userId => {
       addReceived(guildId, userId);
     });
 
     const reply = mentions.size === 1
-      ? `<@${message.author.id}>さん、記録しました！`
-      : `<@${message.author.id}>さん、${mentions.size}人分を記録しました！`;
+      ? `<@${senderId}>さん、記録しました！`
+      : `<@${senderId}>さん、${mentions.size}人分を記録しました！`;
 
     message.reply(reply);
   });
