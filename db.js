@@ -2,7 +2,7 @@ import sqlite3 from 'sqlite3';
 const db = new sqlite3.Database('./emojiStats.db');
 
 db.serialize(() => {
-  // 統計データ
+  // 統計データ（累計）
   db.run(`
     CREATE TABLE IF NOT EXISTS stats (
       guildId TEXT,
@@ -20,13 +20,26 @@ db.serialize(() => {
       emoji TEXT DEFAULT '<:mag_coin:1367495903900074054>',
       channelId TEXT,
       sendTime TEXT DEFAULT '09:00',
-      sendDay TEXT DEFAULT 'Monday'
+      sendDay TEXT DEFAULT 'Monday',
+      lastSent TEXT
+    )
+  `);
+
+  // 日別統計（週次集計用）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS daily_stats (
+      guildId TEXT,
+      userId TEXT,
+      date TEXT, -- yyyy-mm-dd
+      sent INTEGER DEFAULT 0,
+      received INTEGER DEFAULT 0,
+      PRIMARY KEY (guildId, userId, date)
     )
   `);
 });
 
 // ------------------------
-// 統計管理
+// 累計統計
 // ------------------------
 
 export function addSent(guildId, userId) {
@@ -58,6 +71,38 @@ export function resetStats(guildId, userId = null) {
   } else {
     db.run(`UPDATE stats SET sent = 0, received = 0 WHERE guildId = ?`, [guildId]);
   }
+}
+
+// ------------------------
+// 日別統計（週次集計用）
+// ------------------------
+
+export function addDailySent(guildId, userId, date) {
+  db.run(`
+    INSERT INTO daily_stats (guildId, userId, date, sent, received)
+    VALUES (?, ?, ?, 1, 0)
+    ON CONFLICT(guildId, userId, date) DO UPDATE SET sent = sent + 1
+  `, [guildId, userId, date]);
+}
+
+export function addDailyReceived(guildId, userId, date) {
+  db.run(`
+    INSERT INTO daily_stats (guildId, userId, date, sent, received)
+    VALUES (?, ?, ?, 0, 1)
+    ON CONFLICT(guildId, userId, date) DO UPDATE SET received = received + 1
+  `, [guildId, userId, date]);
+}
+
+export function getWeeklyStats(guildId, startDate, endDate, callback) {
+  db.all(`
+    SELECT userId, SUM(sent) as sent, SUM(received) as received
+    FROM daily_stats
+    WHERE guildId = ? AND date BETWEEN ? AND ?
+    GROUP BY userId
+  `, [guildId, startDate, endDate], (err, rows) => {
+    if (err) return callback([]);
+    callback(rows);
+  });
 }
 
 // ------------------------
@@ -100,5 +145,16 @@ export function getSettings(guildId, callback) {
   db.get(`SELECT * FROM guild_settings WHERE guildId = ?`, [guildId], (err, row) => {
     if (err) return callback(null);
     callback(row);
+  });
+}
+
+export function setLastSent(guildId, timestamp) {
+  db.run(`UPDATE guild_settings SET lastSent = ? WHERE guildId = ?`, [timestamp, guildId]);
+}
+
+export function getLastSent(guildId, callback) {
+  db.get(`SELECT lastSent FROM guild_settings WHERE guildId = ?`, [guildId], (err, row) => {
+    if (err) return callback(null);
+    callback(row?.lastSent);
   });
 }
