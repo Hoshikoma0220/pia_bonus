@@ -290,22 +290,32 @@ export function getAllGuildConfigs() {
 export function getFormattedStats(guildId) {
   try {
     const rows = db.prepare(`
-      SELECT s.userId, s.sent, s.received, d.displayName
+      SELECT s.userId, s.sent, s.received, d.displayName, gs.emoji
       FROM stats s
-      LEFT JOIN user_display_names d
-      ON s.guildId = d.guildId AND s.userId = d.userId
+      LEFT JOIN user_display_names d ON s.guildId = d.guildId AND s.userId = d.userId
+      LEFT JOIN guild_settings gs ON s.guildId = gs.guildId
       WHERE s.guildId = ?
     `).all(guildId);
 
-    return rows
-      .filter(row => row.sent > 0 || row.received > 0)
-      .map(row => {
-        const displayParts = [];
-        if (row.sent > 0) displayParts.push(`送信: ${row.sent}`);
-        if (row.received > 0) displayParts.push(`受信: ${row.received}`);
-        const name = row.displayName || `ID: ${row.userId}`;
-        return `${name}（${displayParts.join(' / ')}）`;
-      });
+    const emoji = rows.length > 0 ? (rows[0].emoji || '🔸') : '🔸';
+
+    const sortedSent = rows.filter(r => r.sent > 0).sort((a, b) => b.sent - a.sent);
+    const sortedReceived = rows.filter(r => r.received > 0).sort((a, b) => b.received - a.received);
+
+    const linesSent = sortedSent.map((row, i) =>
+      `${i + 1}位: ${row.displayName || `不明なユーザー`} さん　（${emoji} × ${row.sent}）`
+    );
+    const linesReceived = sortedReceived.map((row, i) =>
+      `${i + 1}位: ${row.displayName || `不明なユーザー`} さん　（${emoji} × ${row.received}）`
+    );
+
+    return [
+      `==今週のgiveAward==`,
+      ...linesSent,
+      '',
+      `==今週のreceiveAward==`,
+      ...linesReceived
+    ];
   } catch (e) {
     console.error('❌ getFormattedStats error:', e);
     return [];
