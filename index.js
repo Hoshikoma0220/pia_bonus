@@ -403,28 +403,19 @@ client.on(Events.InteractionCreate, async interaction => {
 
   } else if (commandName === 'pia_total') {
     getStatsByGuild(guildId, async rows => {
-      const sortedSent = rows.filter(r => r.sent > 0).sort((a, b) => b.sent - a.sent).slice(0, 5);
-      const sortedReceived = rows.filter(r => r.received > 0).sort((a, b) => b.received - a.received).slice(0, 5);
-
-      const linesSent = await Promise.all(sortedSent.map(async row => {
-        const member = await interaction.guild.members.fetch(row.userId).catch(() => null);
-        return `${member?.displayName ?? row.userId}: ${row.sent}個`;
-      }));
-
-      const linesReceived = await Promise.all(sortedReceived.map(async row => {
-        const member = await interaction.guild.members.fetch(row.userId).catch(() => null);
-        return `${member?.displayName ?? row.userId}: ${row.received}個`;
-      }));
-
-      const response = [
-        `**累計のgiveAward:**`,
-        ...linesSent,
-        '',
-        `**累計のreceiveAward:**`,
-        ...linesReceived
-      ].join('\n');
-
-      interaction.reply({ content: response });
+      // 新形式: sent/received両方0の行を除外、0のみの項目は表示しない
+      const filteredRows = rows.filter(r => r.sent > 0 || r.received > 0);
+      if (filteredRows.length === 0) {
+        return interaction.reply({ content: '統計データがありません。', ephemeral: true });
+      }
+      const statsMessage = (await Promise.all(filteredRows.map(async stat => {
+        const member = await interaction.guild.members.fetch(stat.userId).catch(() => null);
+        let parts = [];
+        if (stat.sent > 0) parts.push(`📤 ${stat.sent} 回`);
+        if (stat.received > 0) parts.push(`📥 ${stat.received} 回`);
+        return `<@${stat.userId}>：${parts.join('　')}`;
+      }))).join('\n');
+      interaction.reply({ content: statsMessage });
     });
 
   } else if (commandName === 'pia_settings') {

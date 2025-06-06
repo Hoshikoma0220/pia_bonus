@@ -283,3 +283,31 @@ export function getAllGuildConfigs() {
     day: row.sendDay
   }));
 }
+// ------------------------
+// 統計データ表示用フォーマット
+// ------------------------
+
+export function getFormattedStats(guildId) {
+  try {
+    const rows = db.prepare(`
+      SELECT s.userId, s.sent, s.received, d.displayName
+      FROM stats s
+      LEFT JOIN user_display_names d
+      ON s.guildId = d.guildId AND s.userId = d.userId
+      WHERE s.guildId = ?
+    `).all(guildId);
+
+    return rows
+      .filter(row => row.sent > 0 || row.received > 0)
+      .map(row => {
+        const displayParts = [];
+        if (row.sent > 0) displayParts.push(`送信: ${row.sent}`);
+        if (row.received > 0) displayParts.push(`受信: ${row.received}`);
+        const name = row.displayName || `ID: ${row.userId}`;
+        return `${name}（${displayParts.join(' / ')}）`;
+      });
+  } catch (e) {
+    console.error('❌ getFormattedStats error:', e);
+    return [];
+  }
+}
