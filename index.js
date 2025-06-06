@@ -403,19 +403,36 @@ client.on(Events.InteractionCreate, async interaction => {
 
   } else if (commandName === 'pia_total') {
     getStatsByGuild(guildId, async rows => {
-      // 新形式: sent/received両方0の行を除外、0のみの項目は表示しない
       const filteredRows = rows.filter(r => r.sent > 0 || r.received > 0);
       if (filteredRows.length === 0) {
         return interaction.reply({ content: '統計データがありません。', ephemeral: true });
       }
-      const statsMessage = (await Promise.all(filteredRows.map(async stat => {
+
+      const lines = await Promise.all(filteredRows.map(async stat => {
         const member = await interaction.guild.members.fetch(stat.userId).catch(() => null);
+        const name = member?.displayName ?? `<@${stat.userId}>`;
         let parts = [];
         if (stat.sent > 0) parts.push(`📤 ${stat.sent} 回`);
         if (stat.received > 0) parts.push(`📥 ${stat.received} 回`);
-        return `<@${stat.userId}>：${parts.join('　')}`;
-      }))).join('\n');
-      interaction.reply({ content: statsMessage });
+        return `${name}：${parts.join('　')}`;
+      }));
+
+      const header = '**📊 累計データ**\n';
+      const chunks = [];
+      let current = header;
+      for (const line of lines) {
+        if ((current + line + '\n').length > 1900) {
+          chunks.push(current);
+          current = '';
+        }
+        current += line + '\n';
+      }
+      if (current) chunks.push(current);
+
+      await interaction.reply({ content: chunks[0] });
+      for (let i = 1; i < chunks.length; i++) {
+        await interaction.followUp({ content: chunks[i] });
+      }
     });
 
   } else if (commandName === 'pia_settings') {
