@@ -451,10 +451,9 @@ if (commandName === 'pia_help') {
 
       // --- split and send ---
       const contents = splitMessageContent(content);
-      for (let i = 0; i < contents.length; i++) {
-        if (i === 0) {
-          await interaction.followUp({ content: contents[i], ephemeral: false });
-        } else {
+      if (contents.length > 0) {
+        await interaction.reply({ content: contents[0], ephemeral: false });
+        for (let i = 1; i < contents.length; i++) {
           await interaction.followUp({ content: contents[i], ephemeral: false });
         }
       }
@@ -497,17 +496,6 @@ else if (commandName === 'pia_weekly') {
     return chunks;
   }
 
-  // Utility to split and send long messages
-  async function splitMessageAndSend(interaction, fullText) {
-    const chunks = splitMessageContent(fullText);
-    for (let i = 0; i < chunks.length; i++) {
-      if (i === 0) {
-        await interaction.reply({ content: chunks[i], ephemeral: false });
-      } else {
-        await interaction.followUp({ content: chunks[i], ephemeral: false });
-      }
-    }
-  }
 
   // Get weekly stats for this guild
   const now = moment().tz('Asia/Tokyo');
@@ -550,11 +538,13 @@ else if (commandName === 'pia_weekly') {
         ...linesReceived
       ].join('\n');
 
-      // Use splitMessageAndSend to reply, splitting if needed
-      // Always use followUp for all pages (including first) for consistency
+      // Use splitMessageContent to split and send, using reply for first chunk and followUp for subsequent
       const chunks = splitMessageContent(weeklyText);
-      for (let i = 0; i < chunks.length; i++) {
-        await interaction.followUp({ content: chunks[i], ephemeral: false });
+      if (chunks.length > 0) {
+        await interaction.reply({ content: chunks[0], ephemeral: false });
+        for (let i = 1; i < chunks.length; i++) {
+          await interaction.followUp({ content: chunks[i], ephemeral: false });
+        }
       }
     });
   });
