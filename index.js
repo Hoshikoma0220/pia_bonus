@@ -408,31 +408,34 @@ client.on(Events.InteractionCreate, async interaction => {
         return interaction.reply({ content: '統計データがありません。', ephemeral: true });
       }
 
-      const lines = await Promise.all(filteredRows.map(async stat => {
-        const member = await interaction.guild.members.fetch(stat.userId).catch(() => null);
-        const name = member?.displayName ?? `<@${stat.userId}>`;
-        let parts = [];
-        if (stat.sent > 0) parts.push(`📤 ${stat.sent} 回`);
-        if (stat.received > 0) parts.push(`📥 ${stat.received} 回`);
-        return `${name}：${parts.join('　')}`;
-      }));
+      getSettings(guildId, async settings => {
+        const emoji = settings?.emoji ?? '🔸';
 
-      const header = '**📊 累計データ**\n';
-      const chunks = [];
-      let current = header;
-      for (const line of lines) {
-        if ((current + line + '\n').length > 1900) {
-          chunks.push(current);
-          current = '';
-        }
-        current += line + '\n';
-      }
-      if (current) chunks.push(current);
+        const sentStats = filteredRows.filter(r => r.sent > 0).sort((a, b) => b.sent - a.sent);
+        const receivedStats = filteredRows.filter(r => r.received > 0).sort((a, b) => b.received - a.received);
 
-      await interaction.reply({ content: chunks[0] });
-      for (let i = 1; i < chunks.length; i++) {
-        await interaction.followUp({ content: chunks[i] });
-      }
+        const formatLines = async (list, type) => {
+          return Promise.all(list.map(async (stat, index) => {
+            const member = await interaction.guild.members.fetch(stat.userId).catch(() => null);
+            const name = member?.displayName ?? `<@${stat.userId}>`;
+            const count = type === 'sent' ? stat.sent : stat.received;
+            return `${index + 1}位: ${name} さん　（${emoji} ✕ ${count}）`;
+          }));
+        };
+
+        const linesSent = await formatLines(sentStats, 'sent');
+        const linesReceived = await formatLines(receivedStats, 'received');
+
+        const content = [
+          `==累計のgiveAward==`,
+          ...linesSent,
+          '',
+          `==累計のreceiveAward==`,
+          ...linesReceived
+        ].join('\n');
+
+        await interaction.reply({ content });
+      });
     });
 
   } else if (commandName === 'pia_settings') {
