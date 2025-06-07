@@ -384,77 +384,178 @@ client.on(Events.InteractionCreate, async interaction => {
     }
   }
 
-  if (!interaction.isChatInputCommand()) return;
-  const { commandName, options, guildId, user, member } = interaction;
+if (!interaction.isChatInputCommand()) return;
+const { commandName, options, guildId, user, member } = interaction;
 
-  if (commandName === 'pia_help') {
-    interaction.reply({
-      content:
-        `📘 **Pia Bot ヘルプガイド**\n\n` +
-        `🛠 **設定方法**\n` +
-        `- \`/pia_config\` を使用して設定メニューを表示\n` +
-        `- ボタンから「チャンネル」「絵文字」「曜日」「時刻」「記録リセット」「設定リセット」の設定が可能です\n\n` +
-        `📊 **情報確認**\n` +
-        `- /pia_total：累計ランキング\n` +
-        `- /pia_weekly：今週のランキング\n` +
-        `- /pia_settings：現在の設定表示`,
-      ephemeral: true
-    });
+if (commandName === 'pia_help') {
+  interaction.reply({
+    content:
+      `📘 **Pia Bot ヘルプガイド**\n\n` +
+      `🛠 **設定方法**\n` +
+      `- \`/pia_config\` を使用して設定メニューを表示\n` +
+      `- ボタンから「チャンネル」「絵文字」「曜日」「時刻」「記録リセット」「設定リセット」の設定が可能です\n\n` +
+      `📊 **情報確認**\n` +
+      `- /pia_total：累計ランキング\n` +
+      `- /pia_weekly：今週のランキング\n` +
+      `- /pia_settings：現在の設定表示`,
+    ephemeral: true
+  });
 
-  } else if (commandName === 'pia_total') {
-    getStatsByGuild(guildId, async rows => {
-      const filteredRows = rows.filter(r => r.sent > 0 || r.received > 0);
-      if (filteredRows.length === 0) {
-        return interaction.reply({ content: '統計データがありません。', ephemeral: true });
-      }
+} else if (commandName === 'pia_total') {
+  getStatsByGuild(guildId, async rows => {
+    const filteredRows = rows.filter(r => r.sent > 0 || r.received > 0);
+    if (filteredRows.length === 0) {
+      return interaction.reply({ content: '統計データがありません。', ephemeral: true });
+    }
 
-      getSettings(guildId, async settings => {
-        const emoji = settings?.emoji ?? '🔸';
+    getSettings(guildId, async settings => {
+      const emoji = settings?.emoji ?? '🔸';
 
-        const sentStats = filteredRows.filter(r => r.sent > 0).sort((a, b) => b.sent - a.sent);
-        const receivedStats = filteredRows.filter(r => r.received > 0).sort((a, b) => b.received - a.received);
+      const sentStats = filteredRows.filter(r => r.sent > 0).sort((a, b) => b.sent - a.sent);
+      const receivedStats = filteredRows.filter(r => r.received > 0).sort((a, b) => b.received - a.received);
 
-        const formatLines = async (list, type) => {
-          return Promise.all(list.map(async (stat, index) => {
-            const member = await interaction.guild.members.fetch(stat.userId).catch(() => null);
-            const name = member?.displayName ?? `<@${stat.userId}>`;
-            const count = type === 'sent' ? stat.sent : stat.received;
-            return `${index + 1}位: ${name} さん　（${emoji} ✕ ${count}）`;
-          }));
-        };
+      const formatLines = async (list, type) => {
+        return Promise.all(list.map(async (stat, index) => {
+          const member = await interaction.guild.members.fetch(stat.userId).catch(() => null);
+          const name = member?.displayName ?? `<@${stat.userId}>`;
+          const count = type === 'sent' ? stat.sent : stat.received;
+          return `${index + 1}位: ${name} さん　（${emoji} ✕ ${count}）`;
+        }));
+      };
 
-        const linesSent = await formatLines(sentStats, 'sent');
-        const linesReceived = await formatLines(receivedStats, 'received');
+      const linesSent = await formatLines(sentStats, 'sent');
+      const linesReceived = await formatLines(receivedStats, 'received');
 
-        const content = [
-          `==累計のgiveAward==`,
-          ...linesSent,
-          '',
-          `==累計のreceiveAward==`,
-          ...linesReceived
-        ].join('\n');
-
-        await interaction.reply({ content });
-      });
-    });
-
-  } else if (commandName === 'pia_settings') {
-    getSettings(guildId, (settings) => {
-      if (!settings) {
-        return interaction.reply({ content: '設定がまだ保存されていません。', ephemeral: true });
-      }
-
-      const summary = [
-        `📝 **現在の設定**`,
-        `📌 絵文字: ${settings.emoji || '未設定'}`,
-        `📢 チャンネル: ${settings.channelId ? `<#${settings.channelId}>` : '未設定'}`,
-        `⏰ 送信時刻: ${settings.sendTime || '未設定'}`,
-        `📅 曜日: ${settings.sendDay || '未設定'}`
+      const content = [
+        `==累計のgiveAward==`,
+        ...linesSent,
+        '',
+        `==累計のreceiveAward==`,
+        ...linesReceived
       ].join('\n');
 
-      interaction.reply({ content: summary, ephemeral: true });
+      // --- splitMessageContent utility ---
+      function splitMessageContent(content, maxLength = 2000) {
+        const chunks = [];
+        let current = '';
+        for (const line of content.split('\n')) {
+          if ((current + line + '\n').length > maxLength) {
+            chunks.push(current);
+            current = '';
+          }
+          current += line + '\n';
+        }
+        if (current) chunks.push(current);
+        return chunks;
+      }
+
+      // --- split and send ---
+      const contents = splitMessageContent(content);
+      for (let i = 0; i < contents.length; i++) {
+        if (i === 0) {
+          await interaction.reply({ content: contents[i], ephemeral: false });
+        } else {
+          await interaction.followUp({ content: contents[i], ephemeral: false });
+        }
+      }
     });
+  });
+
+} else if (commandName === 'pia_settings') {
+  getSettings(guildId, (settings) => {
+    if (!settings) {
+      return interaction.reply({ content: '設定がまだ保存されていません。', ephemeral: true });
+    }
+
+    const summary = [
+      `📝 **現在の設定**`,
+      `📌 絵文字: ${settings.emoji || '未設定'}`,
+      `📢 チャンネル: ${settings.channelId ? `<#${settings.channelId}>` : '未設定'}`,
+      `⏰ 送信時刻: ${settings.sendTime || '未設定'}`,
+      `📅 曜日: ${settings.sendDay || '未設定'}`
+    ].join('\n');
+
+    interaction.reply({ content: summary, ephemeral: true });
+  });
+}
+
+// --- pia_weekly コマンド: 今週の送受信数ランキングを表示 ---
+else if (commandName === 'pia_weekly') {
+  const guildId = interaction.guildId;
+  // Utility to split a message by lines to fit Discord's 2000 char limit
+  function splitMessageContent(content, maxLength = 2000) {
+    const chunks = [];
+    let current = '';
+    for (const line of content.split('\n')) {
+      if ((current + line + '\n').length > maxLength) {
+        chunks.push(current);
+        current = '';
+      }
+      current += line + '\n';
+    }
+    if (current) chunks.push(current);
+    return chunks;
   }
+
+  // Utility to split and send long messages
+  async function splitMessageAndSend(interaction, fullText) {
+    const chunks = splitMessageContent(fullText);
+    for (let i = 0; i < chunks.length; i++) {
+      if (i === 0) {
+        await interaction.reply({ content: chunks[i], ephemeral: false });
+      } else {
+        await interaction.followUp({ content: chunks[i], ephemeral: false });
+      }
+    }
+  }
+
+  // Get weekly stats for this guild
+  const now = moment().tz('Asia/Tokyo');
+  const endDate = now.toDate();
+  const startDate = now.clone().subtract(7, 'days').toDate();
+
+  getWeeklyStats(
+    guildId,
+    startDate.toISOString(),
+    endDate.toISOString()
+  ).then(async rows => {
+    if (!rows || rows.length === 0) {
+      return interaction.reply({ content: '今週のデータがありません。', ephemeral: true });
+    }
+
+    getSettings(guildId, async settings => {
+      const emoji = settings?.emoji ?? '🔸';
+      const sortedSent = rows.filter(r => r.sent > 0).sort((a, b) => b.sent - a.sent);
+      const sortedReceived = rows.filter(r => r.received > 0).sort((a, b) => b.received - a.received);
+
+      const linesSent = await Promise.all(sortedSent.map(async (row, idx) => {
+        const member = await interaction.guild.members.fetch(row.userId).catch(() => null);
+        const displayName = member?.displayName ?? `<@${row.userId}>`;
+        const count = row.sent;
+        return `${idx + 1}位: ${displayName} さん　（${emoji} ✕ ${count}）`;
+      }));
+
+      const linesReceived = await Promise.all(sortedReceived.map(async (row, idx) => {
+        const member = await interaction.guild.members.fetch(row.userId).catch(() => null);
+        const displayName = member?.displayName ?? `<@${row.userId}>`;
+        const count = row.received;
+        return `${idx + 1}位: ${displayName} さん　（${emoji} ✕ ${count}）`;
+      }));
+
+      const weeklyText = [
+        `==今週のgiveAward==`,
+        ...linesSent,
+        '',
+        `==今週のreceiveAward==`,
+        ...linesReceived
+      ].join('\n');
+
+      // Use splitMessageAndSend to reply, splitting if needed
+      await splitMessageAndSend(interaction, weeklyText);
+      // Remove or comment out any previous single-message reply here to avoid duplicates.
+    });
+  });
+}
 });
 
 cron.schedule('*/5 * * * *', () => {
@@ -609,3 +710,6 @@ logGuildConfigs();
 
 // Schedule to run every minute
 setInterval(logGuildConfigs, 60 * 1000);  
+  // --- pia_weekly コマンド: 今週の送受信数ランキングを表示 ---
+  // Removed redundant block starting with `} else if (commandName === 'pia_weekly') {`
+  // The functionality for 'pia_weekly' is already implemented earlier in the code.
