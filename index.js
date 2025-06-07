@@ -453,7 +453,7 @@ if (commandName === 'pia_help') {
       const contents = splitMessageContent(content);
       for (let i = 0; i < contents.length; i++) {
         if (i === 0) {
-          await interaction.reply({ content: contents[i], ephemeral: false });
+          await interaction.followUp({ content: contents[i], ephemeral: false });
         } else {
           await interaction.followUp({ content: contents[i], ephemeral: false });
         }
@@ -551,8 +551,11 @@ else if (commandName === 'pia_weekly') {
       ].join('\n');
 
       // Use splitMessageAndSend to reply, splitting if needed
-      await splitMessageAndSend(interaction, weeklyText);
-      // Remove or comment out any previous single-message reply here to avoid duplicates.
+      // Always use followUp for all pages (including first) for consistency
+      const chunks = splitMessageContent(weeklyText);
+      for (let i = 0; i < chunks.length; i++) {
+        await interaction.followUp({ content: chunks[i], ephemeral: false });
+      }
     });
   });
 }
